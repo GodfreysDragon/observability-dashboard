@@ -92,6 +92,14 @@ return [
     'traces_per_route_per_minute' => 30,
 
     /*
+    | Cache store for the per-minute budget counters above (null = the default store).
+    | Each kept trace or exception costs an add + increment here, so in production point
+    | it at Redis rather than the database store.
+    */
+
+    'budget_store' => env('OBSERVABILITY_BUDGET_STORE'),
+
+    /*
     |--------------------------------------------------------------------------
     | Service level objectives
     |--------------------------------------------------------------------------

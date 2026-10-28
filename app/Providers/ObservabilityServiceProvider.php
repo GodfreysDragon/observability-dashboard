@@ -6,7 +6,7 @@ use App\Observability\ExceptionGrouper;
 use App\Observability\Recorder;
 use App\Observability\RollupWriter;
 use App\Observability\TraceWriter;
-use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -24,7 +24,7 @@ class ObservabilityServiceProvider extends ServiceProvider
         $this->app->singleton(TraceWriter::class, fn ($app) => new TraceWriter(
             new RollupWriter,
             new ExceptionGrouper($app->basePath()),
-            $app->make(Cache::class),
+            $app->make(CacheFactory::class),
             $app['config'],
         ));
 

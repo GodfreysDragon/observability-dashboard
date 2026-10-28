@@ -42,6 +42,9 @@ return [
             'journal_mode' => null,
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
+            // Rollup GROUP BYs need temp B-trees. `artisan serve` strips TEMP/TMP from its worker
+            // environment, so on Windows SQLite cannot create temp files; keep them in memory.
+            'pragmas' => ['temp_store' => 'MEMORY'],
         ],
 
         'mysql' => [

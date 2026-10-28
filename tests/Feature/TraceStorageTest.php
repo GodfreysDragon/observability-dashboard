@@ -64,7 +64,8 @@ class TraceStorageTest extends TestCase
 
     public function test_an_error_storm_keeps_only_the_per_route_trace_budget_but_counts_everything(): void
     {
-        config(['observability.traces_per_route_per_minute' => 2]);
+        // A per-test store, so counters left by earlier tests (e.g. in Redis) can't use up the budget.
+        config(['observability.traces_per_route_per_minute' => 2, 'observability.budget_store' => 'array']);
         $customer = Customer::factory()->legacyRegion()->create();
         $invoice = Invoice::factory()->withLines(1)->create(['customer_id' => $customer->id]);
 
@@ -77,6 +78,23 @@ class TraceStorageTest extends TestCase
         $this->assertEquals(4, $minutes->sum('server_errors'));
         $this->assertSame($minutes->sum(fn (object $minute) => min(2, (int) $minute->count)), DB::table('obs_requests')->count());
         $this->assertEquals(4, DB::table('obs_exception_groups')->value('occurrences'));
+    }
+
+    public function test_budget_counters_use_the_configured_cache_store(): void
+    {
+        config(['cache.default' => 'database', 'observability.budget_store' => null]);
+        $customer = Customer::factory()->legacyRegion()->create();
+        $invoice = Invoice::factory()->withLines(1)->create(['customer_id' => $customer->id]);
+
+        $this->getJson("/ledgerline/invoices/{$invoice->number}/pdf")->assertServerError();
+        $counters = DB::table('cache')->count();
+        $this->assertGreaterThan(0, $counters, 'Without a budget store the default (database) store keeps the counters.');
+
+        config(['observability.budget_store' => 'array']);
+        $this->getJson("/ledgerline/invoices/{$invoice->number}/pdf")->assertServerError();
+
+        $this->assertSame($counters, DB::table('cache')->count());
+        $this->assertEquals(2, DB::table('obs_exception_groups')->value('occurrences'));
     }
 
     public function test_trace_owner_and_retention_columns_are_indexed(): void

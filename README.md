@@ -59,13 +59,17 @@ php artisan test --exclude-group slow             # skip the ~25s simulator dete
 E2E_URL=http://127.0.0.1:8050 npm run test:e2e    # browser smoke test (needs a running, seeded app and Edge/Chrome)
 ```
 
-The same suite runs against MySQL 8.4, where rollups use MySQL's upsert dialect:
+The same suite runs against MySQL 8.4, MariaDB 11.4 and Postgres 17, each with its own upsert dialect. For example:
 
 ```bash
 docker compose up -d mysql
 DB_CONNECTION=mysql DB_PORT=33061 DB_DATABASE=testing DB_PASSWORD=secret DB_USE_UPSERT_ALIAS=true php artisan test
 ```
 
-CI (`.github/workflows/tests.yml`) runs Pint and the suite on both SQLite and MySQL.
+`compose.yaml` lists the ports for the others. CI (`.github/workflows/tests.yml`) runs Pint and the suite on SQLite,
+MySQL (with the budget counters in Redis), MariaDB and Postgres.
+
+In production, set `OBSERVABILITY_BUDGET_STORE=redis`. Otherwise the per-minute trace and exception budgets live in
+the default cache store, which here is the database.
 
 Verification status, build notes and to-dos live in a local `Project_Summary.md`, which is kept out of git.

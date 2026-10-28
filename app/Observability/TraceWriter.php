@@ -2,7 +2,7 @@
 
 namespace App\Observability;
 
-use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ final class TraceWriter
     public function __construct(
         private readonly RollupWriter $rollups,
         private readonly ExceptionGrouper $grouper,
-        private readonly Cache $cache,
+        private readonly CacheFactory $caches,
         private readonly Config $config,
     ) {}
 
@@ -280,9 +280,10 @@ final class TraceWriter
     private function withinBudget(string $key, int $timestamp, int $limit): bool
     {
         $key .= ':'.intdiv($timestamp, 60);
-        $this->cache->add($key, 0, 120);
+        $cache = $this->caches->store($this->config->get('observability.budget_store'));
+        $cache->add($key, 0, 120);
 
-        return $this->cache->increment($key) <= $limit;
+        return $cache->increment($key) <= $limit;
     }
 
     private function time(float $timestamp): string
