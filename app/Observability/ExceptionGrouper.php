@@ -115,16 +115,23 @@ final class ExceptionGrouper
 
     private function isApp(string $file): bool
     {
-        $file = str_replace('\\', '/', $file);
+        $relative = $this->relative($file);
 
-        return ! str_contains($file, '/vendor/')
-            && ! str_contains($file, '/app/Observability/')
-            && str_starts_with($file, str_replace('\\', '/', $this->basePath));
+        return $relative !== str_replace('\\', '/', $file)
+            && ! str_starts_with($relative, 'vendor/')
+            && ! str_starts_with($relative, 'app/Observability/');
     }
 
+    /**
+     * The path relative to the project root. Only a leading base path is removed: with the
+     * app at /app, "/app/app/Jobs/X.php" must become "app/Jobs/X.php", not "Jobs/X.php".
+     */
     private function relative(string $file): string
     {
-        return ltrim(str_replace([str_replace('\\', '/', $this->basePath), '\\'], ['', '/'], str_replace('\\', '/', $file)), '/');
+        $file = str_replace('\\', '/', $file);
+        $base = rtrim(str_replace('\\', '/', $this->basePath), '/').'/';
+
+        return str_starts_with($file, $base) ? substr($file, strlen($base)) : $file;
     }
 
     /**

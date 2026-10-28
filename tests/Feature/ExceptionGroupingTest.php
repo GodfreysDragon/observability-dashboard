@@ -50,6 +50,26 @@ class ExceptionGroupingTest extends TestCase
         );
     }
 
+    public function test_paths_are_relative_to_a_base_path_that_also_appears_inside_them(): void
+    {
+        // A Docker image at /app holds the code in /app/app/...
+        $exception = new class('Missing VAT rate') extends RuntimeException
+        {
+            public function __construct(string $message)
+            {
+                parent::__construct($message);
+                $this->file = '/app/app/Ledgerline/InvoiceRenderer.php';
+                $this->line = 21;
+            }
+        };
+
+        $described = (new ExceptionGrouper('/app'))->describe($exception);
+
+        $this->assertSame('app/Ledgerline/InvoiceRenderer.php', $described['file']);
+        $this->assertSame('app/Ledgerline/InvoiceRenderer.php', $described['trace'][0]['file']);
+        $this->assertTrue($described['trace'][0]['app']);
+    }
+
     private function capture(callable $callback): Throwable
     {
         try {

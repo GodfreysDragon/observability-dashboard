@@ -189,16 +189,23 @@ final class Recorder
      */
     private function location(): ?string
     {
-        $base = str_replace('\\', '/', base_path()).'/';
+        $base = rtrim(str_replace('\\', '/', base_path()), '/').'/';
 
         foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40) as $frame) {
             $file = str_replace('\\', '/', $frame['file'] ?? '');
 
-            if ($file === '' || preg_match('~/(vendor|app/Observability)/|/app/Http/Middleware/RecordRequest\.php$|/public/index\.php$|/artisan$~', $file)) {
+            if (! str_starts_with($file, $base)) {
                 continue;
             }
 
-            return str_replace($base, '', $file).':'.($frame['line'] ?? 0);
+            // Match on the relative path, so a base path that happens to contain "/vendor/" still works.
+            $relative = substr($file, strlen($base));
+
+            if (preg_match('~^(vendor/|app/Observability/|app/Http/Middleware/RecordRequest\.php$|public/index\.php$|artisan$)~', $relative)) {
+                continue;
+            }
+
+            return $relative.':'.($frame['line'] ?? 0);
         }
 
         return null;

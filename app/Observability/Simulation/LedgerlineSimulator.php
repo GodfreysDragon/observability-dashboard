@@ -8,6 +8,8 @@ use App\Observability\RollupWriter;
 use App\Observability\SqlNormalizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 
 /**
  * Backfills a week of believable telemetry for Ledgerline, through the same RollupBuffer
@@ -53,6 +55,8 @@ final class LedgerlineSimulator
     /** @var array<string, list<array<string, mixed>>> raw rows waiting for insert */
     private array $raw = [];
 
+    private Randomizer $random;
+
     private int $nextRequestId = 1;
 
     private int $nextJobRunId = 1;
@@ -78,7 +82,9 @@ final class LedgerlineSimulator
      */
     public function run(int $days = 7, int $seed = 7, ?int $now = null, ?callable $progress = null): array
     {
-        mt_srand($seed);
+        // A private generator: nothing else in the process can draw from it, so a run depends only on
+        // its seed and anchor time. Mt19937 yields the same sequence as a seeded mt_rand().
+        $this->random = new Randomizer(new Mt19937($seed));
 
         $this->now = intdiv($now ?? time(), 60) * 60;
         $this->start = $this->now - $days * 86400;
@@ -349,7 +355,7 @@ final class LedgerlineSimulator
             $count = $this->poisson($rpm * $share);
 
             for ($i = 0; $i < $count; $i++) {
-                $spawned = $this->simulateRequest($route, $minute + mt_rand(0, 59999) / 1000, $buffer);
+                $spawned = $this->simulateRequest($route, $minute + $this->random->getInt(0, 59999) / 1000, $buffer);
 
                 foreach ($spawned as $job) {
                     $arrivals[$job]++;
@@ -572,7 +578,7 @@ final class LedgerlineSimulator
                     $budgetMs -= $runtime;
                     $cohort['count']--;
 
-                    $wait = $cohort['attempt'] === 1 ? max(5.0, ($start - $cohort['at']) * 1000 + mt_rand(5, 900)) : null;
+                    $wait = $cohort['attempt'] === 1 ? max(5.0, ($start - $cohort['at']) * 1000 + $this->random->getInt(5, 900)) : null;
                     $this->recordJob($buffer, $queue, $cohort['job'], $status, $cohort['attempt'], $start, $runtime, $wait, $exception);
 
                     if ($status === 'released') {
@@ -735,10 +741,10 @@ final class LedgerlineSimulator
     private function exampleUri(string $path): string
     {
         return match ($path) {
-            '[unmatched]' => mt_rand(0, 1) ? '/ledgerline/wp-login.php' : '/ledgerline/invoices/export.csv',
+            '[unmatched]' => $this->random->getInt(0, 1) ? '/ledgerline/wp-login.php' : '/ledgerline/invoices/export.csv',
             default => strtr($path, [
-                '{invoice}' => sprintf('INV-%06d', 100000 + mt_rand(1, 3000)),
-                '{customer}' => (string) mt_rand(1, 300),
+                '{invoice}' => sprintf('INV-%06d', 100000 + $this->random->getInt(1, 3000)),
+                '{customer}' => (string) $this->random->getInt(1, 300),
             ]),
         };
     }
@@ -768,7 +774,7 @@ final class LedgerlineSimulator
 
     private function uniform(): float
     {
-        return mt_rand() / mt_getrandmax();
+        return $this->random->nextInt() / mt_getrandmax();
     }
 
     private function chance(float $probability): bool
