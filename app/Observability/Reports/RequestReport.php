@@ -154,10 +154,13 @@ final class RequestReport
             return [];
         }
 
+        // `sql` is a reserved word in MySQL, so quote it the connection's way.
+        $sql = DB::getQueryGrammar()->wrap('sql');
+
         return DB::table('obs_queries')
             ->joinSub((clone $traces)->select('id'), 'traces', 'traces.id', '=', 'obs_queries.request_id')
             ->groupBy('fingerprint')
-            ->selectRaw('fingerprint, MIN(sql) AS sql, COUNT(*) AS calls, SUM(duration_ms) AS total_ms, MAX(duration_ms) AS max_ms')
+            ->selectRaw("fingerprint, MIN({$sql}) AS {$sql}, COUNT(*) AS calls, SUM(duration_ms) AS total_ms, MAX(duration_ms) AS max_ms")
             ->orderByDesc('total_ms')
             ->limit($limit)
             ->get()

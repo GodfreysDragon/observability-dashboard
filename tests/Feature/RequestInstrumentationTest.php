@@ -7,6 +7,7 @@ use App\Models\Ledgerline\Invoice;
 use App\Observability\Histogram;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 class RequestInstrumentationTest extends TestCase
@@ -65,7 +66,8 @@ class RequestInstrumentationTest extends TestCase
 
         $lazyLoad = DB::table('obs_queries')
             ->where('request_id', $trace->id)
-            ->where('sql', 'like', '%from "customers" where "customers"."id" = ?%')
+            // `_` matches either driver's identifier quote (" on SQLite, ` on MySQL).
+            ->where('sql', 'like', '%from _customers_ where _customers_._id_ = ?%')
             ->get();
 
         $this->assertCount(8, $lazyLoad);
@@ -142,8 +144,16 @@ class RequestInstrumentationTest extends TestCase
     public function test_a_failing_telemetry_write_never_breaks_the_monitored_request(): void
     {
         $invoice = Invoice::factory()->withLines(1)->create();
-        DB::statement('DROP TABLE obs_request_rollups');
+
+        // Fail every rollup write at the database layer. Dropping the table instead would
+        // implicitly commit on MySQL and break the test's own transaction.
+        DB::connection()->beforeExecuting(function (string $query) {
+            if (str_contains($query, 'obs_request_rollups')) {
+                throw new RuntimeException('Telemetry database unavailable');
+            }
+        });
 
         $this->getJson('/ledgerline/invoices/'.$invoice->number)->assertOk();
+        $this->assertDatabaseCount('obs_query_rollups', 0);
     }
 }

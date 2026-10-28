@@ -41,20 +41,31 @@ Don't expose them on a public host. The dashboard API (`/api/admin/*`) requires 
 |---|---|---|
 | Recorder | `app/Observability/Recorder.php` | Holds the current request or job in memory. Persists it in `terminate()`, after the response is sent. Fails open and ignores its own queries. |
 | Query capture | `SqlNormalizer`, `Trace` | Fingerprints SQL: literals become `?` and IN-lists collapse. Bindings are never stored. Records the app file:line that issued each query. Flags N+1 when one SELECT shape runs 5+ times. |
-| Tail sampling | `TraceWriter::sampleReason()` | Keeps every error, exception, slow request, slow query and N+1. Keeps 10% of everything else. |
+| Tail sampling | `TraceWriter::sampleReason()` | Keeps every error, exception, slow request, slow query and N+1, up to 30 traces per route (or job class) per minute. Keeps 10% of everything else. |
 | Rollups | `RollupBuffer`, `RollupWriter` | Minute and hour rows for requests, queries, jobs and exceptions. A latency histogram is stored as 51 integer columns, so writes are one atomic `INSERT … ON CONFLICT DO UPDATE SET h7 = h7 + excluded.h7`, with no locks or read-modify-write. |
 | Percentiles | `Histogram` | Log-scale buckets that grow ×1.25 each. Buckets are summed in SQL, then interpolated geometrically. Also gives the "fraction under X ms" figure that latency SLOs need. |
 | Exceptions | `ExceptionGrouper` | Groups by class and first app frame (not by message). Credentials are scrubbed. Stores at most 20 occurrences per group per minute and counts all of them. A resolved group reopens if it recurs. |
 | Jobs | `ObservabilityServiceProvider` | Queue events plus an enqueue timestamp in the payload give wait time, runtime and processed/released/failed status. |
 | Reports | `app/Observability/Reports/*` | Overview, routes, traces, queries, exceptions, queues, deploy comparisons and SLOs with multi-window burn rates. |
 
-Artisan commands: `obs:simulate`, `obs:traffic`, `obs:deploy`, `obs:snapshot-queues`, `obs:prune`.
+Artisan commands: `obs:simulate`, `obs:traffic`, `obs:deploy`, `obs:snapshot-queues`, `obs:prune`, and `obs:admin <email>`
+to add a dashboard user (or reset a password).
 
 ## Tests
 
 ```bash
-php artisan test                                  # PHPUnit
+php artisan test                                  # PHPUnit on in-memory SQLite
+php artisan test --exclude-group slow             # skip the ~25s simulator determinism tests
 E2E_URL=http://127.0.0.1:8050 npm run test:e2e    # browser smoke test (needs a running, seeded app and Edge/Chrome)
 ```
+
+The same suite runs against MySQL 8.4, where rollups use MySQL's upsert dialect:
+
+```bash
+docker compose up -d mysql
+DB_CONNECTION=mysql DB_PORT=33061 DB_DATABASE=testing DB_PASSWORD=secret DB_USE_UPSERT_ALIAS=true php artisan test
+```
+
+CI (`.github/workflows/tests.yml`) runs Pint and the suite on both SQLite and MySQL.
 
 Verification status, build notes and to-dos live in a local `Project_Summary.md`, which is kept out of git.

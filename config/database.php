@@ -59,6 +59,8 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // MySQL 8.0.19+: upserts reference the incoming row by alias instead of the deprecated VALUES().
+            'use_upsert_alias' => (bool) env('DB_USE_UPSERT_ALIAS', false),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

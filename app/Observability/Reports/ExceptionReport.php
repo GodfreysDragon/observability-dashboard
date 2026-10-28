@@ -92,7 +92,8 @@ final class ExceptionReport
 
         $releases = DB::table('obs_exceptions')
             ->where('group_id', $groupId)
-            ->selectRaw('release, COUNT(*) AS count, MIN(occurred_at) AS first_at')
+            ->select('release')
+            ->selectRaw('COUNT(*) AS count, MIN(occurred_at) AS first_at')
             ->groupBy('release')
             ->orderBy('first_at')
             ->get();

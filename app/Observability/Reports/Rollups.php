@@ -41,6 +41,8 @@ final class Rollups
             $scope($query);
         }
 
+        // Column names are quoted by the grammar, so a reserved word can't break one driver.
+        $wrap = fn (string $column) => $query->getGrammar()->wrap($column);
         $select = [];
 
         if ($byTime) {
@@ -48,20 +50,20 @@ final class Rollups
         }
 
         foreach ($groupBy as $column) {
-            $select[] = $column;
+            $select[] = $wrap($column);
         }
 
         foreach ($sums as $column) {
-            $select[] = "SUM({$column}) AS {$column}";
+            $select[] = "SUM({$wrap($column)}) AS {$wrap($column)}";
         }
 
         foreach ($max as $column) {
-            $select[] = "MAX({$column}) AS {$column}";
+            $select[] = "MAX({$wrap($column)}) AS {$wrap($column)}";
         }
 
         if ($histogram) {
             foreach (Histogram::columns() as $column) {
-                $select[] = "SUM({$column}) AS {$column}";
+                $select[] = "SUM({$wrap($column)}) AS {$wrap($column)}";
             }
         }
 
