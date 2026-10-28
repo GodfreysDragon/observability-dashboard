@@ -29,6 +29,8 @@ class PruneTelemetry extends Command
             'request traces' => $this->batched('obs_requests', 'occurred_at', $traceCutoff),
             'job runs' => $this->batched('obs_job_runs', 'occurred_at', $traceCutoff),
             'queue snapshots' => $this->batched('obs_queue_snapshots', 'taken_at', $now - $retention['snapshots_days'] * 86400),
+            'exception groups' => $this->batched('obs_exception_groups', 'last_seen_at', gmdate('Y-m-d H:i:s', $now - $retention['exceptions_days'] * 86400)),
+            'query fingerprints' => $this->unusedFingerprints(),
         ];
 
         foreach ($deleted as $what => $count) {
@@ -45,6 +47,27 @@ class PruneTelemetry extends Command
         foreach (['obs_request_rollups', 'obs_query_rollups', 'obs_job_rollups', 'obs_exception_rollups'] as $table) {
             $total += $this->batched($table, 'bucket', $before, fn (Builder $query) => $query->where('period', $period));
         }
+
+        return $total;
+    }
+
+    /**
+     * Fingerprints that no retained rollup or stored query refers to any more. Runs after
+     * the rollups and queries are pruned, so it sees what is left.
+     */
+    private function unusedFingerprints(): int
+    {
+        $total = 0;
+
+        do {
+            $fingerprints = DB::table('obs_query_fingerprints')
+                ->whereNotIn('fingerprint', DB::table('obs_query_rollups')->select('fingerprint'))
+                ->whereNotIn('fingerprint', DB::table('obs_queries')->select('fingerprint'))
+                ->limit(self::BATCH)
+                ->pluck('fingerprint');
+
+            $total += $fingerprints->isEmpty() ? 0 : DB::table('obs_query_fingerprints')->whereIn('fingerprint', $fingerprints)->delete();
+        } while ($fingerprints->count() === self::BATCH);
 
         return $total;
     }

@@ -145,7 +145,7 @@ final class TraceWriter
             $failed => 'error',
             $trace->exceptions !== [] => 'exception',
             $slow => 'slow',
-            $trace->slowestQueryMs() >= $this->config->get('observability.slow_query_ms') => 'slow_query',
+            $trace->slowestQueryMs >= $this->config->get('observability.slow_query_ms') => 'slow_query',
             $nPlusOne => 'n_plus_one',
             mt_rand() / mt_getrandmax() < $this->config->get('observability.sample_rate') => 'random',
             default => null,
@@ -157,8 +157,10 @@ final class TraceWriter
      */
     private function bufferQueries(RollupBuffer $buffer, Trace $trace, int $timestamp, array $nPlusOne): void
     {
-        foreach ($trace->queries as $query) {
-            $buffer->addQuery($timestamp, $query['fingerprint'], $query['duration_ms']);
+        foreach ($trace->shapes as $fingerprint => $shape) {
+            foreach ($shape['durations'] as $durationMs) {
+                $buffer->addQuery($timestamp, $fingerprint, $durationMs);
+            }
         }
 
         foreach (array_keys($nPlusOne) as $fingerprint) {
@@ -189,17 +191,17 @@ final class TraceWriter
     {
         $rows = [];
 
-        foreach ($trace->queries as $query) {
-            $rows[$query['fingerprint']] ??= [
-                'fingerprint' => $query['fingerprint'],
-                'sql' => $query['sql'],
+        foreach ($trace->shapes as $fingerprint => $shape) {
+            $rows[] = [
+                'fingerprint' => $fingerprint,
+                'sql' => $shape['sql'],
                 'connection' => DB::getDefaultConnection(),
                 'first_seen_at' => $this->time($trace->startedAt),
             ];
         }
 
         if ($rows !== []) {
-            DB::table('obs_query_fingerprints')->insertOrIgnore(array_values($rows));
+            DB::table('obs_query_fingerprints')->insertOrIgnore($rows);
         }
     }
 
@@ -246,8 +248,11 @@ final class TraceWriter
             'occurrences' => 0,
         ]);
 
-        // A recurrence reopens a resolved group: that is a regression, not old news.
+        // A recurrence reopens a resolved group: that is a regression, not old news. The
+        // fingerprint ignores line numbers, so keep the location pointing at current code.
         DB::table('obs_exception_groups')->where('fingerprint', $described['fingerprint'])->update([
+            'file' => $described['file'],
+            'line' => $described['line'],
             'last_seen_at' => $time,
             'occurrences' => DB::raw('occurrences + 1'),
             'resolved_at' => null,

@@ -2,6 +2,7 @@
 
 namespace App\Observability\Simulation;
 
+use App\Observability\ExceptionGrouper;
 use App\Observability\RollupBuffer;
 use App\Observability\RollupWriter;
 use App\Observability\SqlNormalizer;
@@ -228,6 +229,7 @@ final class LedgerlineSimulator
                 'message' => 'Undefined array key "XI"',
                 'file' => 'app/Ledgerline/InvoiceRenderer.php',
                 'line' => 21,
+                'function' => 'App\Ledgerline\InvoiceRenderer->render',
                 'frames' => [
                     ['app/Ledgerline/InvoiceRenderer.php', 21, 'throw ErrorException', true],
                     ['vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php', 258, 'Illuminate\Foundation\Bootstrap\HandleExceptions->handleError()', false],
@@ -242,6 +244,7 @@ final class LedgerlineSimulator
                 'message' => 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction (Connection: mysql, SQL: select * from `invoices` where `number` = INV-104211 limit 1 for update)',
                 'file' => 'app/Http/Controllers/Ledgerline/PaymentWebhookController.php',
                 'line' => 28,
+                'function' => 'App\Http\Controllers\Ledgerline\PaymentWebhookController->{closure}',
                 'frames' => [
                     ['vendor/laravel/framework/src/Illuminate/Database/Connection.php', 838, 'throw QueryException', false],
                     ['vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php', 760, 'Illuminate\Database\Eloquent\Builder->firstOrFail()', false],
@@ -255,6 +258,7 @@ final class LedgerlineSimulator
                 'message' => 'SMTP relay refused connection: 421 4.7.0 Try again later',
                 'file' => 'app/Jobs/SendInvoiceEmail.php',
                 'line' => 33,
+                'function' => 'App\Jobs\SendInvoiceEmail->handle',
                 'frames' => [
                     ['app/Jobs/SendInvoiceEmail.php', 33, 'throw RuntimeException', true],
                     ['vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php', 36, 'App\Jobs\SendInvoiceEmail->handle()', false],
@@ -268,7 +272,7 @@ final class LedgerlineSimulator
         foreach ($definitions as $key => $definition) {
             $id = DB::table('obs_exception_groups')->insertGetId([
                 // Same fingerprint formula as ExceptionGrouper, so live occurrences join these groups.
-                'fingerprint' => sha1($definition['class'].'|'.$definition['file'].'|'.$definition['line']),
+                'fingerprint' => ExceptionGrouper::fingerprint($definition['class'], $definition['file'], $definition['function']),
                 'class' => $definition['class'],
                 'message' => $definition['message'],
                 'file' => $definition['file'],

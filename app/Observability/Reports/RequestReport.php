@@ -66,12 +66,15 @@ final class RequestReport
      * Every route in the window with its latency profile, error rates and the share of
      * total server time it consumed (count x mean): the "where does the time go" ranking.
      *
+     * @param  bool  $comparePrevious  include each route's p95 change against the previous window
      * @return list<array<string, mixed>>
      */
-    public static function routes(TimeRange $range): array
+    public static function routes(TimeRange $range, bool $comparePrevious = true): array
     {
         $current = Rollups::aggregate('obs_request_rollups', $range, self::SUMS, ['duration_max'], groupBy: ['route']);
-        $previous = Rollups::aggregate('obs_request_rollups', $range->previous(), ['count'], ['duration_max'], groupBy: ['route'])->keyBy('route');
+        $previous = $comparePrevious
+            ? Rollups::aggregate('obs_request_rollups', $range->previous(), ['count'], ['duration_max'], groupBy: ['route'])->keyBy('route')
+            : collect();
         $totalTime = max(1e-9, (float) $current->sum('duration_sum'));
 
         return $current

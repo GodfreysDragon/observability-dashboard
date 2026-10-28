@@ -49,10 +49,22 @@ export async function request(method, url, { params, body, signal } = {}) {
 
     const data = await response.json().catch(() => null);
 
-    if (response.status === 401) onUnauthorized();
+    // 419: the session expired along with its CSRF token. Pick up the new session's token
+    // so the login form can post, then send the user to sign in again.
+    if (response.status === 419) await refreshCsrfToken();
+    if (response.status === 401 || response.status === 419) onUnauthorized();
     if (!response.ok) throw new ApiError(response.status, data);
 
     return data;
+}
+
+async function refreshCsrfToken() {
+    try {
+        const response = await fetch('/api/admin/me', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        setCsrfToken((await response.json())?.csrf_token);
+    } catch {
+        // Leave the old token; the login form will surface the failure.
+    }
 }
 
 export const api = {

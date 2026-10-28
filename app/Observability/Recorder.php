@@ -194,7 +194,7 @@ final class Recorder
         foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 40) as $frame) {
             $file = str_replace('\\', '/', $frame['file'] ?? '');
 
-            if ($file === '' || preg_match('~/(vendor|app/Observability)/|/app/Http/Middleware/RecordRequest.php$|/public/index.php$|/artisan$~', $file)) {
+            if ($file === '' || preg_match('~/(vendor|app/Observability)/|/app/Http/Middleware/RecordRequest\.php$|/public/index\.php$|/artisan$~', $file)) {
                 continue;
             }
 

@@ -75,7 +75,7 @@ const timeRows = computed(() =>
                     <div class="mt-2 flex gap-4 text-xs text-muted">
                         <span>Burn rate 1h <strong class="font-medium text-ink-2 tabular-nums">{{ o.burn_rate_1h ?? '–' }}×</strong></span>
                         <span>6h <strong class="font-medium text-ink-2 tabular-nums">{{ o.burn_rate_6h ?? '–' }}×</strong></span>
-                        <span class="hidden sm:inline">pages at 14.4×, tickets at 6×</span>
+                        <span class="hidden sm:inline">pages at {{ o.fast_burn_threshold }}×, tickets at {{ o.slow_burn_threshold }}×</span>
                     </div>
                 </div>
             </div>

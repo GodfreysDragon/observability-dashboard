@@ -31,6 +31,10 @@ php artisan obs:traffic --minutes=5 --rpm=120      # real HTTP traffic against /
 To reproduce the N+1 regression on live traffic, set `LEDGERLINE_EAGER_LOAD=false`. To stamp a release, set
 `APP_RELEASE=v3.16.0`, then run `php artisan obs:deploy v3.16.0`.
 
+The Ledgerline routes under `/ledgerline/*` are a demo workload and have no authentication on purpose, so
+`obs:traffic` can drive them. In particular, `POST /ledgerline/webhooks/payments` does not verify a gateway signature.
+Don't expose them on a public host. The dashboard API (`/api/admin/*`) requires a session login.
+
 ## How it works
 
 | Piece | Where | What it does |
@@ -53,4 +57,4 @@ php artisan test                                  # PHPUnit
 E2E_URL=http://127.0.0.1:8050 npm run test:e2e    # browser smoke test (needs a running, seeded app and Edge/Chrome)
 ```
 
-See `Project_Summary.md` for verification status, notes from the build, to-dos and next steps.
+Verification status, build notes and to-dos live in a local `Project_Summary.md`, which is kept out of git.

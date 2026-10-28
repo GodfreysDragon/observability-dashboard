@@ -12,12 +12,26 @@ final class Trace
 {
     public const int MAX_STORED_QUERIES = 500;
 
-    /** @var list<array{fingerprint: string, sql: string, duration_ms: float, offset_ms: float, location: ?string, select: bool}> */
+    /**
+     * The first MAX_STORED_QUERIES queries, kept for the waterfall of a sampled trace.
+     *
+     * @var list<array{fingerprint: string, sql: string, duration_ms: float, offset_ms: float, location: ?string, select: bool}>
+     */
     public array $queries = [];
+
+    /**
+     * Every query, grouped by fingerprint. Rollups and N+1 detection read this rather
+     * than $queries, so they stay complete past the storage cap.
+     *
+     * @var array<string, array{sql: string, select: bool, durations: list<float>}>
+     */
+    public array $shapes = [];
 
     public int $queryCount = 0;
 
     public float $queryMs = 0.0;
+
+    public float $slowestQueryMs = 0.0;
 
     /** @var list<Throwable> */
     public array $exceptions = [];
@@ -45,6 +59,10 @@ final class Trace
     {
         $this->queryCount++;
         $this->queryMs += $durationMs;
+        $this->slowestQueryMs = max($this->slowestQueryMs, $durationMs);
+
+        $this->shapes[$fingerprint] ??= ['sql' => $sql, 'select' => SqlNormalizer::isSelect($sql), 'durations' => []];
+        $this->shapes[$fingerprint]['durations'][] = $durationMs;
 
         if (count($this->queries) >= self::MAX_STORED_QUERIES) {
             return;
@@ -56,7 +74,7 @@ final class Trace
             'duration_ms' => $durationMs,
             'offset_ms' => max(0.0, $this->elapsedMs() - $durationMs),
             'location' => $location,
-            'select' => SqlNormalizer::isSelect($sql),
+            'select' => $this->shapes[$fingerprint]['select'],
         ];
     }
 
@@ -70,17 +88,12 @@ final class Trace
     {
         $counts = [];
 
-        foreach ($this->queries as $query) {
-            if ($query['select']) {
-                $counts[$query['fingerprint']] = ($counts[$query['fingerprint']] ?? 0) + 1;
+        foreach ($this->shapes as $fingerprint => $shape) {
+            if ($shape['select'] && count($shape['durations']) >= $threshold) {
+                $counts[$fingerprint] = count($shape['durations']);
             }
         }
 
-        return array_filter($counts, fn (int $count) => $count >= $threshold);
-    }
-
-    public function slowestQueryMs(): float
-    {
-        return $this->queries === [] ? 0.0 : max(array_column($this->queries, 'duration_ms'));
+        return $counts;
     }
 }

@@ -16,6 +16,7 @@ const verdicts = {
     improved: ['ok', 'Improved'],
     neutral: ['neutral', 'No significant change'],
     pending: ['warning', 'Collecting data'],
+    insufficient: ['neutral', 'Too close to another deploy'],
 };
 
 const metrics = [

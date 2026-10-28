@@ -11,7 +11,10 @@ class AuthController extends Controller
 {
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $request->user()?->only('id', 'name', 'email')]);
+        return response()->json([
+            'user' => $request->user()?->only('id', 'name', 'email'),
+            'csrf_token' => csrf_token(),
+        ]);
     }
 
     public function login(Request $request): JsonResponse

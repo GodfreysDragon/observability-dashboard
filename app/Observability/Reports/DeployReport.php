@@ -23,10 +23,16 @@ final class DeployReport
     public static function list(int $limit = 12, ?int $now = null): array
     {
         $now ??= now()->getTimestamp();
-        $deploys = DB::table('obs_deploys')->orderBy('deployed_at')->get();
+
+        // One extra (older) deploy bounds the oldest listed deploy's "before" window.
+        $deploys = DB::table('obs_deploys')->orderByDesc('deployed_at')->limit($limit + 1)->get()->reverse()->values();
         $results = [];
 
         foreach ($deploys as $i => $deploy) {
+            if ($i === 0 && $deploys->count() > $limit) {
+                continue;
+            }
+
             $at = strtotime($deploy->deployed_at.' UTC');
             $previousAt = isset($deploys[$i - 1]) ? strtotime($deploys[$i - 1]->deployed_at.' UTC') : null;
             $nextAt = isset($deploys[$i + 1]) ? strtotime($deploys[$i + 1]->deployed_at.' UTC') : null;
@@ -43,7 +49,7 @@ final class DeployReport
             ] + self::compare($deploy->release, $at, $window, $now);
         }
 
-        return array_slice(array_reverse($results), 0, $limit);
+        return array_reverse($results);
     }
 
     /**
@@ -69,8 +75,10 @@ final class DeployReport
             ->orderByDesc('occurrences')
             ->get(['id', 'class', 'message', 'occurrences']);
 
+        // Too short a window: still collecting if the deploy is recent, otherwise a
+        // neighbouring deploy landed too close for either side to be judged.
         if ($window < self::MIN_WINDOW) {
-            return ['window_s' => max(0, $window), 'verdict' => 'pending', 'before' => null, 'after' => null, 'changes' => [], 'routes' => [], 'new_exceptions' => $newExceptions];
+            return ['window_s' => max(0, $window), 'verdict' => $now - $at < self::MIN_WINDOW ? 'pending' : 'insufficient', 'before' => null, 'after' => null, 'changes' => [], 'routes' => [], 'new_exceptions' => $newExceptions];
         }
 
         // Use minute rollups while they are retained; otherwise hour rollups with the
@@ -114,10 +122,10 @@ final class DeployReport
      */
     private static function routeChanges(TimeRange $before, TimeRange $after): array
     {
-        $beforeRoutes = collect(RequestReport::routes($before))->keyBy('route');
+        $beforeRoutes = collect(RequestReport::routes($before, comparePrevious: false))->keyBy('route');
         $changes = [];
 
-        foreach (RequestReport::routes($after) as $route) {
+        foreach (RequestReport::routes($after, comparePrevious: false) as $route) {
             $baseline = $beforeRoutes->get($route['route']);
 
             if ($baseline === null || $baseline['count'] < self::MIN_ROUTE_SAMPLES || $route['count'] < self::MIN_ROUTE_SAMPLES) {
