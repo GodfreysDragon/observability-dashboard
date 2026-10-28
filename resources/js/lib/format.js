@@ -37,7 +37,8 @@ export function percent(value, digits = 1) {
     const scaled = value * 100;
     // Small rates matter here (0.08% errors), so keep precision below 1%.
     const places = Math.abs(scaled) > 0 && Math.abs(scaled) < 1 ? Math.max(digits, 2) : digits;
-    return `${scaled.toFixed(places).replace(/\.?0+$/, '')}%`;
+    // Trim trailing zeros after the decimal point only: 80 must stay "80%", not "8%".
+    return `${scaled.toFixed(places).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}%`;
 }
 
 export function signedPercent(value) {
