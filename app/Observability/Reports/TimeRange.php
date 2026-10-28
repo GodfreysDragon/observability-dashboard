@@ -44,20 +44,6 @@ final class TimeRange
     }
 
     /**
-     * An explicit window (deploy comparisons), read at the finest resolution still retained.
-     */
-    public static function between(int $from, int $to, ?int $now = null): self
-    {
-        $now ??= now()->getTimestamp();
-        $retained = $now - config('observability.retention.minute_rollups_hours') * 3600;
-        $step = $from >= $retained ? 60 : 3600;
-        $from = intdiv($from, $step) * $step;
-        $to = (int) ceil($to / $step) * $step;
-
-        return new self('custom', $from, max($to, $from + $step), $step, $now);
-    }
-
-    /**
      * The same-length window immediately before this one.
      */
     public function previous(): self

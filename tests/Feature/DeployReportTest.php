@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Observability\Reports\DeployReport;
+use App\Observability\RollupBuffer;
+use App\Observability\RollupWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -44,6 +46,63 @@ class DeployReportTest extends TestCase
         $this->assertSame('insufficient', $verdicts['v1']);
         $this->assertSame('insufficient', $verdicts['v2']);
         $this->assertSame('pending', $verdicts['v3']);
+    }
+
+    public function test_a_route_whose_p95_rises_after_a_deploy_regresses_it(): void
+    {
+        $at = self::NOW - 3 * 3600;
+        $this->deploy('v2', $at);
+        $this->traffic($at - 3 * 3600, $at, durationMs: 100.0);
+        $this->traffic($at, self::NOW, durationMs: 400.0);
+
+        $deploy = DeployReport::list(now: self::NOW)[0];
+
+        $this->assertSame('regressed', $deploy['verdict']);
+        $this->assertSame('GET /ledgerline/invoices', $deploy['routes'][0]['route']);
+        $this->assertGreaterThan(2.0, $deploy['routes'][0]['p95_change']);
+    }
+
+    public function test_a_route_whose_p95_falls_after_a_deploy_improves_it(): void
+    {
+        $at = self::NOW - 3 * 3600;
+        $this->deploy('v2', $at);
+        $this->traffic($at - 3 * 3600, $at, durationMs: 400.0);
+        $this->traffic($at, self::NOW, durationMs: 100.0);
+
+        $this->assertSame('improved', DeployReport::list(now: self::NOW)[0]['verdict']);
+    }
+
+    public function test_hour_windows_snap_inwards_so_the_deploy_hour_counts_on_neither_side(): void
+    {
+        // Older than the minute-rollup retention, so the comparison reads hour rollups.
+        $edge = intdiv(self::NOW - 60 * 3600, 3600) * 3600;
+        $this->deploy('v2', $edge + 1800);
+        $this->traffic($edge - 6 * 3600, $edge, durationMs: 100.0, periods: [3600]);
+        $this->traffic($edge, $edge + 3600, durationMs: 2000.0, periods: [3600]);
+        $this->traffic($edge + 3600, $edge + 7 * 3600, durationMs: 100.0, periods: [3600]);
+
+        $deploy = DeployReport::list(now: self::NOW)[0];
+
+        $this->assertSame('neutral', $deploy['verdict']);
+        $this->assertSame(600, $deploy['before']['count']);
+        $this->assertSame(600, $deploy['after']['count']);
+    }
+
+    /**
+     * 100 requests at every step from `$from` up to (not including) `$to`.
+     *
+     * @param  list<int>  $periods
+     */
+    private function traffic(int $from, int $to, float $durationMs, array $periods = RollupBuffer::PERIODS): void
+    {
+        $buffer = new RollupBuffer(periods: $periods);
+        $step = min($periods);
+
+        for ($t = $from; $t < $to; $t += $step) {
+            $buffer->addRequest($t, 'GET /ledgerline/invoices', 200, $durationMs, 4, 2.0, false, 100);
+        }
+
+        (new RollupWriter)->write($buffer);
     }
 
     private function deploy(string $release, int $at): void

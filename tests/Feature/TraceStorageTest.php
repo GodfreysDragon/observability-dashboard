@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Ledgerline\Customer;
+use App\Models\Ledgerline\Invoice;
 use App\Observability\SqlNormalizer;
 use App\Observability\Trace;
 use App\Observability\TraceWriter;
@@ -58,6 +60,23 @@ class TraceStorageTest extends TestCase
         $this->writeRequest($trace);
 
         $this->assertSame('slow_query', DB::table('obs_requests')->value('sample_reason'));
+    }
+
+    public function test_an_error_storm_keeps_only_the_per_route_trace_budget_but_counts_everything(): void
+    {
+        config(['observability.traces_per_route_per_minute' => 2]);
+        $customer = Customer::factory()->legacyRegion()->create();
+        $invoice = Invoice::factory()->withLines(1)->create(['customer_id' => $customer->id]);
+
+        for ($i = 0; $i < 4; $i++) {
+            $this->getJson("/ledgerline/invoices/{$invoice->number}/pdf")->assertServerError();
+        }
+
+        // The budget resets each minute, so allow for the requests straddling a minute boundary.
+        $minutes = DB::table('obs_request_rollups')->where('period', 60)->get();
+        $this->assertEquals(4, $minutes->sum('server_errors'));
+        $this->assertSame($minutes->sum(fn (object $minute) => min(2, (int) $minute->count)), DB::table('obs_requests')->count());
+        $this->assertEquals(4, DB::table('obs_exception_groups')->value('occurrences'));
     }
 
     public function test_trace_owner_and_retention_columns_are_indexed(): void

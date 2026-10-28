@@ -35,6 +35,8 @@ final class TraceWriter
             trace: $trace,
             slow: $request['duration_ms'] >= $this->config->get('observability.slow_request_ms'),
             nPlusOne: $nPlusOne !== [],
+            budgetKey: 'route:'.$request['route'],
+            timestamp: $timestamp,
         );
 
         $buffer = new RollupBuffer($this->config->get('observability.apdex_t_ms'));
@@ -90,6 +92,8 @@ final class TraceWriter
             trace: $trace,
             slow: $runtimeMs >= $this->config->get('observability.slow_job_ms'),
             nPlusOne: $nPlusOne !== [],
+            budgetKey: 'job:'.$meta['job'],
+            timestamp: $timestamp,
         );
 
         $buffer = new RollupBuffer($this->config->get('observability.apdex_t_ms'));
@@ -137,11 +141,12 @@ final class TraceWriter
     }
 
     /**
-     * Tail-based sampling: decide after the fact, keeping every interesting trace.
+     * Tail-based sampling: decide after the fact, keeping every interesting trace up to
+     * a per-route (or per-job) budget each minute.
      */
-    private function sampleReason(bool $failed, Trace $trace, bool $slow, bool $nPlusOne): ?string
+    private function sampleReason(bool $failed, Trace $trace, bool $slow, bool $nPlusOne, string $budgetKey, int $timestamp): ?string
     {
-        return match (true) {
+        $reason = match (true) {
             $failed => 'error',
             $trace->exceptions !== [] => 'exception',
             $slow => 'slow',
@@ -150,6 +155,14 @@ final class TraceWriter
             mt_rand() / mt_getrandmax() < $this->config->get('observability.sample_rate') => 'random',
             default => null,
         };
+
+        if ($reason === null) {
+            return null;
+        }
+
+        return $this->withinBudget('obs:traces:'.sha1($budgetKey), $timestamp, $this->config->get('observability.traces_per_route_per_minute'))
+            ? $reason
+            : null;
     }
 
     /**
@@ -215,7 +228,7 @@ final class TraceWriter
             $groupId = $this->upsertGroup($described, $trace->startedAt);
             $buffer->addException($timestamp, $groupId);
 
-            if (! $this->withinOccurrenceBudget($groupId, $timestamp)) {
+            if (! $this->withinBudget('obs:exceptions:'.$groupId, $timestamp, $this->config->get('observability.exception_occurrences_per_minute'))) {
                 continue;
             }
 
@@ -261,12 +274,15 @@ final class TraceWriter
         return (int) DB::table('obs_exception_groups')->where('fingerprint', $described['fingerprint'])->value('id');
     }
 
-    private function withinOccurrenceBudget(int $groupId, int $timestamp): bool
+    /**
+     * A per-minute counter: true while fewer than `$limit` writes have used this key.
+     */
+    private function withinBudget(string $key, int $timestamp, int $limit): bool
     {
-        $key = 'obs:exceptions:'.$groupId.':'.intdiv($timestamp, 60);
+        $key .= ':'.intdiv($timestamp, 60);
         $this->cache->add($key, 0, 120);
 
-        return $this->cache->increment($key) <= $this->config->get('observability.exception_occurrences_per_minute');
+        return $this->cache->increment($key) <= $limit;
     }
 
     private function time(float $timestamp): string

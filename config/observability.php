@@ -84,6 +84,14 @@ return [
     'exception_occurrences_per_minute' => 20,
 
     /*
+    | At most this many full traces per route (or job class) per minute are kept,
+    | whatever the sample reason, so an N+1 or error storm can't flood the trace
+    | tables. Rollups still count every request and job.
+    */
+
+    'traces_per_route_per_minute' => 30,
+
+    /*
     |--------------------------------------------------------------------------
     | Service level objectives
     |--------------------------------------------------------------------------

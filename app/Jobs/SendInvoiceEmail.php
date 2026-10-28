@@ -29,7 +29,7 @@ class SendInvoiceEmail implements ShouldQueue
     {
         usleep(random_int(80, 400) * 1000);
 
-        if (random_int(1, 100) <= 3) {
+        if (random_int(1, 100) <= config('ledgerline.smtp_failure_percent')) {
             throw new RuntimeException('SMTP relay refused connection: 421 4.7.0 Try again later');
         }
 

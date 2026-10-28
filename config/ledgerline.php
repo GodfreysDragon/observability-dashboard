@@ -10,6 +10,13 @@ return [
     'eager_load' => env('LEDGERLINE_EAGER_LOAD', true),
 
     /*
+    | Share of invoice emails (in percent) the simulated SMTP relay refuses, so the mail
+    | queue sees retries and failures under live traffic.
+    */
+
+    'smtp_failure_percent' => (int) env('LEDGERLINE_SMTP_FAILURE_PERCENT', 3),
+
+    /*
     | VAT rates by customer region. Legacy accounts imported from the old billing
     | system carry the region code "XI", which is missing here on purpose: rendering
     | their invoice PDFs throws, which is what the exceptions page shows.
