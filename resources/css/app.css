@@ -1,0 +1,243 @@
+@import 'tailwindcss';
+
+@source '../../storage/framework/views/*.php';
+
+/*
+ * Design tokens. Every colour in the UI and the charts is a role defined here, with
+ * light and dark steps chosen separately (dark is not an automatic inversion).
+ * The categorical slots were checked with a CVD/contrast validator in both modes;
+ * light-mode aqua and yellow sit under 3:1, so every chart also has a legend and a table view.
+ */
+:root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface-1: #fcfcfb;
+    --surface-2: #f3f2ee;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.1);
+    --accent: #2a78d6;
+    --accent-ink: #1c5cab;
+    --good-ink: #006300;
+    --bad-ink: #b42f2f;
+    --critical: #d03b3b;
+
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-other: #b9b8b0;
+
+    /* Sequential blue, near-zero to max. */
+    --seq-0: #f0efec;
+    --seq-1: #cde2fb;
+    --seq-2: #9ec5f4;
+    --seq-3: #6da7ec;
+    --seq-4: #3987e5;
+    --seq-5: #256abf;
+    --seq-6: #184f95;
+    --seq-7: #0d366b;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        color-scheme: dark;
+        --page: #0d0d0d;
+        --surface-1: #1a1a19;
+        --surface-2: #232321;
+        --ink: #ffffff;
+        --ink-2: #c3c2b7;
+        --muted: #898781;
+        --grid: #2c2c2a;
+        --axis: #383835;
+        --border: rgba(255, 255, 255, 0.1);
+        --accent: #3987e5;
+        --accent-ink: #86b6ef;
+        --good-ink: #0ca30c;
+        --bad-ink: #e66767;
+        --critical: #d03b3b;
+
+        --series-1: #3987e5;
+        --series-2: #d95926;
+        --series-3: #199e70;
+        --series-4: #c98500;
+        --series-other: #5f5e59;
+
+        --seq-0: #262624;
+        --seq-1: #0d366b;
+        --seq-2: #104281;
+        --seq-3: #184f95;
+        --seq-4: #1c5cab;
+        --seq-5: #2a78d6;
+        --seq-6: #5598e7;
+        --seq-7: #9ec5f4;
+    }
+}
+
+:root[data-theme='dark'] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+    --accent-ink: #86b6ef;
+    --good-ink: #0ca30c;
+    --bad-ink: #e66767;
+    --critical: #d03b3b;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-other: #5f5e59;
+
+    --seq-0: #262624;
+    --seq-1: #0d366b;
+    --seq-2: #104281;
+    --seq-3: #184f95;
+    --seq-4: #1c5cab;
+    --seq-5: #2a78d6;
+    --seq-6: #5598e7;
+    --seq-7: #9ec5f4;
+}
+
+@theme inline {
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+
+    --color-page: var(--page);
+    --color-surface: var(--surface-1);
+    --color-surface-2: var(--surface-2);
+    --color-ink: var(--ink);
+    --color-ink-2: var(--ink-2);
+    --color-muted: var(--muted);
+    --color-grid: var(--grid);
+    --color-axis: var(--axis);
+    --color-line: var(--border);
+    --color-accent: var(--accent);
+    --color-accent-ink: var(--accent-ink);
+    --color-good: var(--good-ink);
+    --color-bad: var(--bad-ink);
+    --color-critical: var(--critical);
+}
+
+@layer base {
+    body {
+        background: var(--page);
+        color: var(--ink);
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
+    .card {
+        @apply rounded-xl border border-line bg-surface;
+    }
+
+    .btn {
+        @apply inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-surface-2 disabled:opacity-50;
+    }
+
+    .btn-primary {
+        @apply border-transparent bg-accent text-white hover:bg-accent-ink;
+    }
+
+    .field {
+        @apply rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted;
+    }
+
+    .label {
+        @apply text-xs font-medium text-ink-2;
+    }
+
+    .data-table {
+        @apply w-full text-sm;
+    }
+
+    .data-table th {
+        @apply border-b border-line px-3 py-2 text-left text-xs font-medium text-ink-2;
+    }
+
+    .data-table td {
+        @apply border-b border-line px-3 py-2 tabular-nums;
+    }
+
+    .data-table tr:last-child td {
+        @apply border-b-0;
+    }
+}
+
+/* Heatmap cells: fill from the sequential ramp; text flips between ink and white by fill luminance. */
+.heat-0 { background: var(--seq-0); color: var(--ink-2); }
+.heat-1 { background: var(--seq-1); color: var(--heat-ink-low); }
+.heat-2 { background: var(--seq-2); color: var(--heat-ink-low); }
+.heat-3 { background: var(--seq-3); color: var(--heat-ink-low); }
+.heat-4 { background: var(--seq-4); color: var(--heat-ink-high); }
+.heat-5 { background: var(--seq-5); color: var(--heat-ink-high); }
+.heat-6 { background: var(--seq-6); color: var(--heat-ink-top); }
+.heat-7 { background: var(--seq-7); color: var(--heat-ink-top); }
+
+:root {
+    --heat-ink-low: #0b0b0b;
+    --heat-ink-high: #ffffff;
+    --heat-ink-top: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --heat-ink-low: #ffffff;
+        --heat-ink-high: #ffffff;
+        --heat-ink-top: #0b0b0b;
+    }
+}
+
+:root[data-theme='dark'] {
+    --heat-ink-low: #ffffff;
+    --heat-ink-high: #ffffff;
+    --heat-ink-top: #0b0b0b;
+}
+
+/*
+ * Status colours are reserved for state (SLO, verdicts, HTTP classes) and are the same
+ * in both modes. They always ship with an icon and a label, never colour alone.
+ */
+:root {
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+}
+
+@theme inline {
+    --color-status-good: var(--status-good);
+    --color-status-warning: var(--status-warning);
+    --color-status-serious: var(--status-serious);
+    --color-status-critical: var(--status-critical);
+}
+
+@layer components {
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-ink-2;
+    }
+
+    .mono {
+        @apply font-mono text-[12px] leading-relaxed;
+    }
+
+    .link {
+        @apply text-accent-ink hover:underline;
+    }
+}
