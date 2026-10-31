@@ -27,4 +27,8 @@ Homestead.yaml
 Thumbs.db
 /storage/e2e
 /Project_Summary.md
-/.claude/settings.local.json
+/.claude/
+/.mcp.json
+/AGENTS.md
+/CLAUDE.md
+/boost.json
